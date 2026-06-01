@@ -73,12 +73,10 @@ services:
   storyteller-opds-proxy:
     image: ghcr.io/hwcrane/storyteller_opds_proxy:latest
     restart: unless-stopped
-    depends_on:
-      - web # Remove this if Storyteller is not in this Compose file.
     ports:
       - "8088:8088"
     environment:
-      STORYTELLER_URL: "http://web:8001"
+      STORYTELLER_URL: "http://storyteller:8001"
       PUBLIC_URL: "http://your-server:8088"
       LISTEN_ADDR: "0.0.0.0:8088"
       CACHE_DIR: "/cache"
@@ -93,7 +91,6 @@ volumes:
   opds_proxy_cache:
 ```
 
-If Storyteller is outside this Compose project, remove the optional `web`, `secrets`, and `storyteller_data` parts, remove `depends_on`, and set `STORYTELLER_URL` to a URL reachable from inside the proxy container.
 
 ## Configuration
 
