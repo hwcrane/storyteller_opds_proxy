@@ -18,6 +18,8 @@ The problem is size and compatibility:
 
 This proxy sits between an OPDS client and Storyteller. It exposes an OPDS catalog that only shows books with a Storyteller `format=readaloud` acquisition, then prepares a smaller EPUB by removing audio and media-overlay files while preserving the XHTML content.
 
+It is designed to be lightweight, I've measured memory usage to be around 5MB at idle and up to 10MB while processing a book.
+
 ## What It Does
 
 For OPDS feeds, the proxy:
@@ -49,6 +51,50 @@ To avoid that, `/download` is retryable:
 
 To avoid a buildup of files, or to pick up a new version after realignment, cache expiry is controlled with `CACHE_TTL_SECS`. Set it to `0` to serve each prepared EPUB once and delete it after the successful response is opened.
 
+## Deployment
+
+The easiest deployment is to run the proxy in the same Docker Compose project as Storyteller. In that setup, set `STORYTELLER_URL` to Storyteller's Compose service name:
+
+```yaml
+STORYTELLER_URL: "http://storyteller:8001"
+```
+
+Set `PUBLIC_URL` to the URL your OPDS client uses to reach the proxy:
+
+```yaml
+PUBLIC_URL: "http://your-server:8088"
+```
+
+
+Example Compose file:
+
+```yaml
+services:
+  storyteller-opds-proxy:
+    image: ghcr.io/hwcrane/storyteller_opds_proxy:latest
+    restart: unless-stopped
+    depends_on:
+      - web # Remove this if Storyteller is not in this Compose file.
+    ports:
+      - "8088:8088"
+    environment:
+      STORYTELLER_URL: "http://web:8001"
+      PUBLIC_URL: "http://your-server:8088"
+      LISTEN_ADDR: "0.0.0.0:8088"
+      CACHE_DIR: "/cache"
+      CACHE_TTL_SECS: "0" # 0 auto removes once served
+      MAX_BODY_BYTES: "5368709120"
+      THREADS: "4"
+      RUST_LOG: "info"
+    volumes:
+      - opds_proxy_cache:/cache
+
+volumes:
+  opds_proxy_cache:
+```
+
+If Storyteller is outside this Compose project, remove the optional `web`, `secrets`, and `storyteller_data` parts, remove `depends_on`, and set `STORYTELLER_URL` to a URL reachable from inside the proxy container.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -61,5 +107,3 @@ To avoid a buildup of files, or to pick up a new version after realignment, cach
 | `MAX_BODY_BYTES` | `5368709120` | Maximum upstream body size to read. Default is 5GB. |
 | `THREADS` | `4` | Number of blocking HTTP worker threads. |
 | `RUST_LOG` | `info` | Logging filter, for example `debug` or `storyteller_opds_proxy=debug`. |
-
-``
