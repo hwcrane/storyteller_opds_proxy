@@ -40,6 +40,7 @@ pub fn start_or_get(
 ) -> DownloadState {
     let cache_path = cache_path(cfg, url, auth);
     if cache_is_fresh(&cache_path, cfg.cache_ttl_secs) {
+        log::info!("serving stripped EPUB from cache: {}", cache_path.display());
         return DownloadState::Ready {
             path: cache_path,
             delete_after_open: cfg.cache_ttl_secs == 0,
@@ -57,6 +58,7 @@ pub fn start_or_get(
     }
 
     mark_job_preparing(key.clone());
+    log::info!("starting stripped EPUB preparation: {key}");
     spawn_prepare_job(
         agent,
         url.to_string(),
@@ -80,8 +82,14 @@ fn spawn_prepare_job(
         let result =
             prepare_download_file(agent, &url, auth.as_deref(), max_body_bytes, &cache_path);
         match result {
-            Ok(()) => clear_job(&job_key),
-            Err(e) => mark_job_failed(job_key, e.to_string()),
+            Ok(()) => {
+                log::info!("finished stripped EPUB preparation: {job_key}");
+                clear_job(&job_key);
+            }
+            Err(e) => {
+                log::error!("failed stripped EPUB preparation: {job_key}: {e}");
+                mark_job_failed(job_key, e.to_string());
+            }
         }
     });
 }
@@ -108,12 +116,14 @@ fn prepare_download_file(
     let result = (|| -> io::Result<()> {
         let mut input_file = File::create(&input_tmp)?;
         let mut upstream = resp.body_mut().with_config().limit(max_body_bytes).reader();
+        log::debug!("streaming upstream EPUB to {}", input_tmp.display());
         io::copy(&mut upstream, &mut input_file)?;
         input_file.flush()?;
         drop(input_file);
 
         // Zip archives need seek access to the central directory, so the
         // upstream EPUB is staged on disk before the file-to-file rewrite.
+        log::debug!("rewriting staged EPUB to {}", output_tmp.display());
         download::strip_audio_for_kindle_file(&input_tmp, &output_tmp)?;
         fs::rename(&output_tmp, cache_path)?;
         Ok(())
@@ -153,6 +163,7 @@ fn cache_is_fresh(path: &PathBuf, ttl_secs: u64) -> bool {
     if age.as_secs() <= ttl_secs {
         true
     } else {
+        log::info!("removing expired stripped EPUB cache: {}", path.display());
         let _ = fs::remove_file(path);
         false
     }

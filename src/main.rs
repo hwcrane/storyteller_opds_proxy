@@ -16,6 +16,8 @@ mod opds;
 use config::ProxyConfig;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     let cfg = Arc::new(ProxyConfig::from_env());
     fs::create_dir_all(&cfg.cache_dir).expect("failed to create cache directory");
 
@@ -26,9 +28,10 @@ fn main() {
     );
 
     let server = Arc::new(Server::http(&cfg.listen_addr).expect("Bind failed"));
-    eprintln!(
+    log::info!(
         "opds proxy listening on {} -> {}",
-        cfg.listen_addr, cfg.storyteller_url
+        cfg.listen_addr,
+        cfg.storyteller_url
     );
 
     let handles: Vec<JoinHandle<()>> = (0..cfg.threads)
@@ -38,7 +41,7 @@ fn main() {
             thread::spawn(move || {
                 while let Ok(req) = server.recv() {
                     if let Err(e) = http::handle(req, &cfg, &agent) {
-                        eprintln!("request error: {e}");
+                        log::error!("request error: {e}");
                     }
                 }
             })

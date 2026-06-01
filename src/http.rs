@@ -26,6 +26,7 @@ pub fn handle(req: Request, cfg: &ProxyConfig, agent: &ureq::Agent) -> io::Resul
     let auth = get_header(&req, "Authorization");
     let base = public_base(cfg, &req);
 
+    log::debug!("{} {}", req.method(), path);
     match path.as_str() {
         "/health" => todo!(),
         "/" | "/opds" => route_opds(req, cfg, agent, &target, &auth, &base),
