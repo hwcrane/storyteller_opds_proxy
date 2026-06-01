@@ -1,0 +1,11 @@
+[package]
+name = "storyteller_opds_proxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+quick-xml = "0.40.1"
+tiny_http = "0.12.0"
+ureq = "3.3.0"
+url = "2.5.8"
+zip = "8.6.0"
